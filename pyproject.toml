@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "impressmem"
 version = "0.1.0"
 authors = [
-    { name="Pacer", email="" }
+    { name="Pacer", email="weichuan.chen@foxmail.com" }
 ]
 description = "Impression-based hierarchical memory management library for AI applications with Redis storage"
 readme = "README.md"
