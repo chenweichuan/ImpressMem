@@ -2,13 +2,11 @@
 - High-density symbol system, time-based rolling
 - Fully loaded into system context during each conversation
 """
-import json
-import re
 import time
+from datetime import datetime
 from typing import List, Dict, Any, Optional, Callable
-from impressmem.utils import logger, count_text_units, stringify_message
+from impressmem.utils import logger, count_text_units
 from impressmem.config import Config
-from impressmem.context_builder import ContextBuilder
 import redis.asyncio as redis
 
 
@@ -19,10 +17,7 @@ class ImpressionManager:
     CATEGORIES_PER_SET = 500
     LABELS_PER_SET = 1500
     CLUES_PER_SET = 500
-    MESSAGE_IDS_PER_SET: int = 500
-    
     IMPRESSION_TEXT_UNITS_PER_SET: int = 15000
-    MESSAGE_TEXT_UNITS_PER_SET: int = 30000
 
     UNPINNED_EMOJI = "⚪"
     PINNED_EMOJI = "📌"
@@ -62,7 +57,6 @@ class ImpressionManager:
             password=config.redis_config.get("password") or None,
             decode_responses=True
         )
-        self.context_builder = ContextBuilder(config)
         
         self.bot_name = config.bot_name
         self.KEY_PREFIX = f"{self.bot_name.lower().replace(' ', '_')}:impression"
@@ -76,8 +70,6 @@ class ImpressionManager:
         self.CATEGORY_CLUE_ZSET_KEY = f"{self.KEY_PREFIX}:category:clues:%s"
         
         self.LABEL_CLUE_ZSET_KEY = f"{self.KEY_PREFIX}:label:clues:%s"
-
-        self.CLUE_MESSAGE_ID_ZSET_KEY = f"{self.KEY_PREFIX}:clue:message_ids:%s"
 
         self.IMPRESSION_CONTENT_KEY = f"{self.KEY_PREFIX}:content:%s"
 
@@ -262,17 +254,6 @@ class ImpressionManager:
 
     # ==================== Clue Memory ====================
 
-    async def get_clue_message_ids(self, clue: str, limit: int = MESSAGE_IDS_PER_SET, timestamp: Optional[float] = None) -> List[tuple[List[str], float]]:
-        """
-        Get limited message IDs for a given clue with their scores (timestamps)
-        """
-        # Use current timestamp if not provided
-        if timestamp is None:
-            timestamp = time.time_ns() // 1_000_000
-        
-        # Get limited message IDs sorted by newest first with scores, before the given timestamp
-        return await self.redis_client.zrevrangebyscore(self.CLUE_MESSAGE_ID_ZSET_KEY % clue, timestamp, 0, start=0, num=limit, withscores=True)
-
     async def get_impressions_by_clues(
         self,
         clues: List[tuple[str, float]] | List[str],
@@ -330,48 +311,8 @@ class ImpressionManager:
         
         return selected_impressions
 
-    async def get_messages_by_clues(self, clues: List[str], max_text_units: int = MESSAGE_TEXT_UNITS_PER_SET, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
-        """
-        Get limited message sets for a given list of clues with their scores (timestamps).
-        Note: Session message retrieval is not fully implemented in this standalone version.
-        """
-        combined_message_ids = []
-        combined_message_id_set = set()
-        selected_messages = []
-
-        logger.info(f"[ImpressionManager] Note: Session message retrieval is not fully implemented in standalone ImpressMem.")
-        
-        return selected_messages
 
     # ==================== Save Memory ====================
-
-    async def save_clue_message_ids(self, clue: str, message_ids: List[str]) -> None:
-        """
-        Save a message IDs for a given clue with a timestamp score
-        """
-        clue = clue.strip().replace("\n", " ")
-        message_ids = list(filter(lambda x: x, [message_id.strip().replace("\n", " ") for message_id in message_ids]))
-        
-        if not clue or not message_ids:
-            logger.error(f"[ImpressionManager] Missing clue or message IDs")
-            return
-            
-        # Use pipeline for atomic operations
-        pipe = await self.redis_client.pipeline()
-        
-        for message_id in message_ids:
-            # Use current timestamp as score
-            score = time.time_ns() / 1_000_000
-            # Save message IDs with score (timestamp)
-            await pipe.zadd(self.CLUE_MESSAGE_ID_ZSET_KEY % clue, {message_id: score})
-            
-        # Remove old message IDs
-        await pipe.zremrangebyrank(self.CLUE_MESSAGE_ID_ZSET_KEY % clue, 0, -10_001)
-        
-        # Execute pipeline
-        await pipe.execute()
-        
-        logger.info(f"[ImpressionManager] Saved clue message IDs: [{clue}]{','.join(message_ids)}")
 
     async def save_impression(self, clue: str, content: str, category: str, labels: List[str], pin: bool = False) -> None:
         """
@@ -635,11 +576,6 @@ class ImpressionManager:
         if not final_content:
             raise ValueError(f"No content found or new content for to_clue: {to_clue}")
         
-        # Get to_clue message ids zset keys
-        to_message_ids_key = self.CLUE_MESSAGE_ID_ZSET_KEY % to_clue
-        
-        # Count messages before merge
-        to_messages_before = await self.redis_client.zcard(to_message_ids_key)
         
         # Get recent categories and their clue zset keys
         recent_categories = await self.get_recent_categories()
@@ -656,14 +592,6 @@ class ImpressionManager:
         
         # Delete from_clues data
         for from_clue in from_clues:
-            from_message_ids_key = self.CLUE_MESSAGE_ID_ZSET_KEY % from_clue
-            
-            # Union merge clues (take max score for duplicates)
-            await pipe.zunionstore(
-                to_message_ids_key,
-                [from_message_ids_key, to_message_ids_key],
-                aggregate="MAX"
-            )
             
             
             # Get the score of from_clue in pinned clues
@@ -710,38 +638,65 @@ class ImpressionManager:
                     # Remove from_clue from the label
                     await pipe.zrem(label_key, from_clue)
         
-        # Count messages after merge
-        await pipe.zcard(to_message_ids_key)
-        
         # Execute pipeline
-        results = await pipe.execute()
-        to_messages_after = results[-1]
-        
-        # Calculate moved messages
-        messages_moved = to_messages_after - to_messages_before
+        await pipe.execute()
         
         logger.info(f"[ImpressionManager] Merged {len(from_clues)} clues into {to_clue}")
         return {
             "level": "clue",
             "from": from_clues,
             "to": to_clue,
-            "final_content": final_content,
-            "messages_moved": messages_moved,
+            "final_content": final_content
         }
 
-    # ==================== Utility Methods ====================
-
-    def slice_new_turn_messages(self, history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """
-        Slice the new turn-of-conversation messages from the history
-
-        Args:
-            history: Conversation history
-
+    async def build_context(self) -> str:
+        """Build memory-related prompt content by directly reading from storage
+        
         Returns:
-            List of new turn-of-conversation messages
+            Memory-related prompt string
         """
-        # Extract last bot message with previous bot message as context (include user messages in between if any)
-        last_bot_idx = len(history) - 1 - next((i for i, msg in enumerate(reversed(history)) if msg["role"] == "assistant"), 0)
-        prev_bot_idx = len(history[:last_bot_idx]) - 1 - next((i for i, msg in enumerate(reversed(history[:last_bot_idx])) if msg["role"] == "assistant"), 0)
-        return history[prev_bot_idx:]
+        prompts = []
+
+        # Categories
+        impression_categories = await self.get_recent_categories()
+        impression_categories = list(reversed(impression_categories))
+        prompts.append(
+            "All your chronological memory impression categories with all users are as follows:\n"
+            "------\n"
+            f"{', '.join([name for name, _ in impression_categories] or [])}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        # Labels
+        impression_labels = await self.get_mixed_labels()
+        impression_labels = list(reversed(impression_labels))
+        prompts.append(
+            "Your recent chronological relevant memory impression labels with all users are as follows:\n"
+            "------\n"
+            f"{', '.join([name for name, _ in impression_labels] or [])}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        # Impressions
+        impressions = await self.get_mixed_impressions()
+        impressions = list(reversed(impressions))
+        impressions_text = "\n".join([
+            f"[{datetime.fromtimestamp(score // 1_000).strftime('%Y-%m-%d %H:%M:%S')}][{pin}][{clue}]{content}"
+            for pin, (clue, content), score in impressions
+        ] or [])
+        prompts.append(
+            "Your recent chronological relevant memory impressions (format [ModTime][Pin][Clue]Content) with all users are as follows:\n"
+            "------\n"
+            "[ModTime][Pin][Clue]Content\n"
+            "------\n"
+            f"{impressions_text}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units('\n\n'.join(prompts))}")
+
+        return "\n\n".join(prompts)
+

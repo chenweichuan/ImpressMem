@@ -6,15 +6,21 @@ build-backend = "setuptools.build_meta"
 name = "impressmem"
 version = "0.1.0"
 authors = [
-    { name="", email="" }
+    { name="Pacer", email="" }
 ]
-description = "Impression-based Memory Management Library"
+description = "Impression-based hierarchical memory management library for AI applications with Redis storage"
 readme = "README.md"
 requires-python = ">=3.8"
 classifiers = [
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Software Development :: Libraries :: Python Modules",
 ]
 dependencies = [
     "redis>=5.0.0",
@@ -22,9 +28,17 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "pytest>=6.0",
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "black",
+    "isort",
+]
+llm = [
+    "openai>=1.0.0",
 ]
 
 [project.urls]
-Homepage = ""
-Issues = ""
+Homepage = "https://github.com/your-username/impressmem"
+Issues = "https://github.com/your-username/impressmem/issues"
+Documentation = "https://github.com/your-username/impressmem#readme"
+Repository = "https://github.com/your-username/impressmem.git"
