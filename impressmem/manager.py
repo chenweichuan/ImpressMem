@@ -212,7 +212,7 @@ class ImpressMemManager:
             limit = self.CATEGORIES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
-            timestamp = time.time_ns() // 1_000_000
+            timestamp = time.time_ns() / 1_000_000
         
         # Get limited categories sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.RECENT_CATEGORY_ZSET_KEY, timestamp, 0, start=0, num=limit, withscores=True)
@@ -225,7 +225,7 @@ class ImpressMemManager:
             limit = self.LABELS_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
-            timestamp = time.time_ns() // 1_000_000
+            timestamp = time.time_ns() / 1_000_000
         
         # Get limited labels sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.RECENT_LABEL_ZSET_KEY, timestamp, 0, start=0, num=limit, withscores=True)
@@ -238,7 +238,7 @@ class ImpressMemManager:
             limit = self.CLUES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
-            timestamp = time.time_ns() // 1_000_000
+            timestamp = time.time_ns() / 1_000_000
         
         # Get limited clues sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.RECENT_CLUE_ZSET_KEY, timestamp, 0, start=0, num=limit, withscores=True)
@@ -262,7 +262,7 @@ class ImpressMemManager:
             limit = self.LABELS_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
-            timestamp = time.time_ns() // 1_000_000
+            timestamp = time.time_ns() / 1_000_000
         
         # Get limited labels sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.CATEGORY_LABEL_ZSET_KEY % category, timestamp, 0, start=0, num=limit, withscores=True)
@@ -275,7 +275,7 @@ class ImpressMemManager:
             limit = self.CLUES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
-            timestamp = time.time_ns() // 1_000_000
+            timestamp = time.time_ns() / 1_000_000
         
         # Get limited clues sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.CATEGORY_CLUE_ZSET_KEY % category, timestamp, 0, start=0, num=limit, withscores=True)
@@ -290,7 +290,7 @@ class ImpressMemManager:
             limit = self.CLUES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
-            timestamp = time.time_ns() // 1_000_000
+            timestamp = time.time_ns() / 1_000_000
         
         # Get limited clues sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.LABEL_CLUE_ZSET_KEY % label, timestamp, 0, start=0, num=limit, withscores=True)
