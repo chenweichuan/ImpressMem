@@ -14,11 +14,11 @@ pip install impressmem
 
 ```python
 import asyncio
-from impressmem import Config, ImpressionManager
+from impressmem import ImpressMemConfig, ImpressMemManager
 
 async def main():
     # Initialize configuration
-    config = Config(
+    config = ImpressMemConfig(
         bot_name="Bot",
         redis_config={
             "host": "localhost",
@@ -27,24 +27,11 @@ async def main():
         }
     )
     
-    # Initialize ImpressionManager
-    manager = await ImpressionManager.initialize(config)
+    # Initialize ImpressMemManager
+    manager = ImpressMemManager(config)
     
-    # Save an impression
-    await manager.save_impression(
-        clue="USER-NAME",
-        content="John Doe",
-        category="PersonalInfo",
-        labels=["UserProfile", "Identity"],
-        pin=False
-    )
-    
-    # Get and build memory context
-    mixed_impressions = await manager.get_mixed_impressions()
-    mixed_labels = await manager.get_mixed_labels()
-    recent_categories = await manager.get_recent_categories()
-    
-    memory_context = await manager.build_context()
+    # Build memory context - use this to get memory context for LLM
+    memory_context = await manager.build_memory_context()
     
     print(memory_context)
     await manager.close()
@@ -64,74 +51,54 @@ asyncio.run(main())
 
 ## Configuration
 
-### Config
+### ImpressMemConfig
+
 ```python
-Config(
+ImpressMemConfig(
     bot_name: str,
-    redis_config: Dict[str, Any] = ...
+    redis_config: Dict[str, Any] = ...,
+    categories_per_set: int = 500,
+    labels_per_set: int = 1500,
+    clues_per_set: int = 500,
+    impression_text_units_per_set: int = 15000,
+    unpinned_emoji: str = "⚪",
+    pinned_emoji: str = "📌",
 )
 ```
 
-### Memory Limits
-Memory limits can be adjusted through the ImpressionManager class constants:
-- `CATEGORIES_PER_SET`: Maximum categories to keep (default: 500)
-- `LABELS_PER_SET`: Maximum labels to keep (default: 1500)
-- `CLUES_PER_SET`: Maximum clues to keep (default: 500)
-- `IMPRESSION_TEXT_UNITS_PER_SET`: Maximum text units for impressions (default: 15000)
+## Core API
 
-## API Reference
-
-### ImpressionManager
-Core memory management class.
+### ImpressMemManager
 
 ```python
 # Initialize
-manager = await ImpressionManager.initialize(config)
+manager = ImpressMemManager(config)
 
-# Save
-await manager.save_impression(clue, content, category, labels, pin=False)
+# Build memory context for LLM
+memory_context = await manager.build_memory_context()
 
-# Get
-mixed_impressions = await manager.get_mixed_impressions()
-mixed_labels = await manager.get_mixed_labels()
-recent_categories = await manager.get_recent_categories()
-recent_labels = await manager.get_recent_labels()
-recent_clues = await manager.get_recent_clues()
-pinned_clues = await manager.get_pinned_clues()
-category_labels = await manager.get_category_labels(category)
-category_clues = await manager.get_category_clues(category)
-label_clues = await manager.get_label_clues(label)
-impressions = await manager.get_impressions_by_clues(clues)
-
-# Build context
-memory_context = await manager.build_context()
-
-# Merge
-await manager.merge_categories(old, new)
-await manager.merge_labels(sources, target)
-await manager.merge_clues(sources, target, new_content=None)
-
-# Close
+# Close connection
 await manager.close()
 ```
 
-### Tools
+### Tools for Memory Operations
+
 OpenAI-compatible tool classes for function calling.
 
 ```python
 from impressmem import SaveImpressionTool, OrganizeImpressionsTool, RecallImpressionsTool
 
-# Initialize tools
-save_tool = SaveImpressionTool()
-organize_tool = OrganizeImpressionsTool()
-recall_tool = RecallImpressionsTool()
+# Initialize tools with manager
+save_tool = SaveImpressionTool(manager)
+organize_tool = OrganizeImpressionsTool(manager)
+recall_tool = RecallImpressionsTool(manager)
 
-# Get tool definitions (for OpenAI function calling)
+# Get tool definitions for OpenAI function calling
 save_def = await save_tool.get_definition()
 organize_def = await organize_tool.get_definition()
 recall_def = await recall_tool.get_definition()
 
-# Execute tools
+# Execute tools with JSON arguments
 full_result, summary = await save_tool.execute(json.dumps(args))
 ```
 
@@ -152,7 +119,7 @@ See the `examples/` directory for more usage examples:
 
 ## Contributing
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+Contributions welcome! Please feel free to submit a Pull Request.
 
 ## License
 

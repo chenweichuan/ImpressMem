@@ -6,7 +6,8 @@ import json
 import time
 from typing import List, Dict, Any
 from .base import Tool
-from ..impression_manager import ImpressionManager
+
+from ..manager import ImpressMemManager
 from ..utils import logger
 
 
@@ -17,9 +18,8 @@ class RecallImpressionsTool(Tool):
     
     name = "recall_impressions"
     
-    def __init__(self):
-        super().__init__()
-        self.impression_manager = ImpressionManager.get_instance()
+    def __init__(self, manager: ImpressMemManager):
+        super().__init__(manager)
     
     async def get_definition(self) -> Dict[str, Any]:
         """Get tool definition for LLM"""
@@ -72,19 +72,19 @@ class RecallImpressionsTool(Tool):
             
             potential_label_scores = {}
             potential_label_tuples = []
-            max_label_tuples = ImpressionManager.LABELS_PER_SET
+            max_label_tuples = self.manager.LABELS_PER_SET
             
             potential_clue_scores = {}
             potential_clue_tuples = []
             potential_impression_tuples = []
-            max_impression_text_units = ImpressionManager.IMPRESSION_TEXT_UNITS_PER_SET 
+            max_impression_text_units = self.manager.IMPRESSION_TEXT_UNITS_PER_SET
 
             # ====== Query by Labels ======
             
             # Query clues by labels
             clue_tuples_by_labels = []
             for label in labels:
-                clue_tuples = await self.impression_manager.get_label_clues(label)
+                clue_tuples = await self.manager.get_label_clues(label)
                 for clue, score in clue_tuples:
                     if clue not in potential_clue_scores:
                         potential_clue_scores[clue] = score
@@ -97,7 +97,7 @@ class RecallImpressionsTool(Tool):
             # Query labels by category
             label_tuples_by_category = []
             if category:
-                label_tuples = await self.impression_manager.get_category_labels(category)
+                label_tuples = await self.manager.get_category_labels(category)
                 for label, score in label_tuples:
                     if label not in potential_label_scores:
                         potential_label_scores[label] = score
@@ -108,7 +108,7 @@ class RecallImpressionsTool(Tool):
             # Query clues by category
             clue_tuples_by_category = []
             if category:
-                clue_tuples = await self.impression_manager.get_category_clues(category)
+                clue_tuples = await self.manager.get_category_clues(category)
                 for clue, score in clue_tuples:
                     if clue not in potential_clue_scores:
                         potential_clue_scores[clue] = score
@@ -120,13 +120,13 @@ class RecallImpressionsTool(Tool):
             
             if not category and not labels:
                 # Query recent labels
-                recent_label_tuples = await self.impression_manager.get_recent_labels()
+                recent_label_tuples = await self.manager.get_recent_labels()
                 for label, score in recent_label_tuples:
                     potential_label_scores[label] = score
                     potential_label_tuples.append((label, score))
                 
                 # Query recent clues
-                recent_clue_tuples = await self.impression_manager.get_recent_clues()
+                recent_clue_tuples = await self.manager.get_recent_clues()
                 for clue, score in recent_clue_tuples:
                     potential_clue_scores[clue] = score
                     potential_clue_tuples.append((clue, score))
@@ -137,7 +137,7 @@ class RecallImpressionsTool(Tool):
             potential_label_tuples = sorted(potential_label_tuples[:max_label_tuples], key=lambda x: x[1])
             
             # Query impressions by clues
-            potential_impression_tuples = await self.impression_manager.get_impressions_by_clues(
+            potential_impression_tuples = await self.manager.get_impressions_by_clues(
                 potential_clue_tuples,
                 max_text_units=max_impression_text_units,
             )

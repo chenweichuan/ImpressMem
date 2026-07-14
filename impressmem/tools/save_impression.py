@@ -4,7 +4,8 @@ Memory save tool for saving memory impressions with specified fields
 import json
 from typing import List, Dict, Any
 from .base import Tool
-from ..impression_manager import ImpressionManager
+
+from ..manager import ImpressMemManager
 from ..utils import logger
 
 
@@ -15,9 +16,8 @@ class SaveImpressionTool(Tool):
     
     name = "save_impression"
     
-    def __init__(self):
-        super().__init__()
-        self.impression_manager = ImpressionManager.get_instance()
+    def __init__(self, manager: ImpressMemManager):
+        super().__init__(manager)
     
     async def get_definition(self) -> Dict[str, Any]:
         """Get tool definition for LLM"""
@@ -107,7 +107,7 @@ class SaveImpressionTool(Tool):
                 return (error_msg, summary)
                 
             # Save the impression
-            await self.impression_manager.save_impression(
+            await self.manager.save_impression(
                 clue=clue,
                 content=content,
                 category=category,

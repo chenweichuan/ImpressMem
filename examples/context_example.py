@@ -6,12 +6,12 @@ ImpressMem 上下文构建示例
 其他接口细节无需关心。
 """
 import asyncio
-from impressmem import Config, ImpressionManager
+from impressmem import ImpressMemConfig, ImpressMemManager
 
 
 async def main():
     # 初始化配置
-    config = Config(
+    config = ImpressMemConfig(
         bot_name="Bot",
         redis_config={
             "host": "localhost",
@@ -21,11 +21,11 @@ async def main():
     )
 
     # 初始化 ImpressionManager
-    manager = await ImpressionManager.initialize(config)
+    manager = ImpressMemManager(config)
 
     try:
         # 构建记忆上下文 - 这是你需要使用的主要 API
-        memory_context = await manager.build_context()
+        memory_context = await manager.build_memory_context()
         print("记忆上下文:")
         print("-" * 50)
         print(memory_context)

@@ -4,7 +4,8 @@ Impression organize tool for merging and organizing memory impression categories
 import json
 from typing import List, Dict, Any
 from .base import Tool
-from ..impression_manager import ImpressionManager
+
+from ..manager import ImpressMemManager
 from ..utils import logger
 
 
@@ -13,9 +14,8 @@ class OrganizeImpressionsTool(Tool):
     
     name = "organize_impressions"
     
-    def __init__(self):
-        super().__init__()
-        self.impression_manager = ImpressionManager.get_instance()
+    def __init__(self, manager: ImpressMemManager):
+        super().__init__(manager)
     
     async def get_definition(self) -> Dict[str, Any]:
         """Get tool definition for LLM"""
@@ -143,11 +143,11 @@ class OrganizeImpressionsTool(Tool):
             logger.debug(f"[OrganizeMemoryTool] Starting {level} merge: from {from_items} to {to_item}, reason: {reason}, check: {check}")
             
             if level == "category":
-                result = await self.impression_manager.merge_categories(from_items[0], to_item)
+                result = await self.manager.merge_categories(from_items[0], to_item)
             elif level == "label":
-                result = await self.impression_manager.merge_labels(from_items, to_item)
+                result = await self.manager.merge_labels(from_items, to_item)
             elif level == "clue":
-                result = await self.impression_manager.merge_clues(from_items, to_item, new_content)
+                result = await self.manager.merge_clues(from_items, to_item, new_content)
             
             result["reason"] = reason
             

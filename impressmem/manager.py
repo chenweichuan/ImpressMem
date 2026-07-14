@@ -4,63 +4,35 @@
 """
 import time
 from datetime import datetime
-from typing import List, Dict, Any, Optional, Callable
-from impressmem.utils import logger, count_text_units
-from impressmem.config import Config
+from typing import List, Dict, Any, Optional
 import redis.asyncio as redis
 
+from impressmem.utils import logger, count_text_units
+from impressmem.config import ImpressMemConfig
 
-class ImpressionManager:
+
+class ImpressMemManager:
     """Impression Entry Manager"""
-    _instance: Optional['ImpressionManager'] = None
-    
-    CATEGORIES_PER_SET = 500
-    LABELS_PER_SET = 1500
-    CLUES_PER_SET = 500
-    IMPRESSION_TEXT_UNITS_PER_SET: int = 15000
 
-    UNPINNED_EMOJI = "⚪"
-    PINNED_EMOJI = "📌"
-
-    @classmethod
-    def get_instance(cls) -> 'ImpressionManager':
-        """
-        Get singleton instance of ImpressionManager
-        
-        Returns:
-            ImpressionManager instance
-        """
-        if cls._instance is None:
-            raise ValueError("ImpressionManager not initialized. Call initialize() first.")
-        return cls._instance
-
-    @classmethod
-    async def initialize(cls, config: Config) -> 'ImpressionManager':
-        """Initialize ImpressionManager with config
-        
-        Args:
-            config: Configuration object for ImpressMem
-            
-        Returns:
-            Initialized ImpressionManager instance
-        """
-        if cls._instance is None:
-            cls._instance = cls(config)
-        return cls._instance
-
-    def __init__(self, config: Config):
-        self.config = config
+    def __init__(self, config: ImpressMemConfig):
         self.redis_client = redis.Redis(
             host=config.redis_config.get("host", "localhost"),
             port=config.redis_config.get("port", 6379),
             db=config.redis_config.get("db", 0),
             password=config.redis_config.get("password") or None,
             decode_responses=True,
-            protocol=2  # Use RESP2 for compatibility with older Redis versions
+            protocol=2  # Use RESP2 for compatibility with older Redis versions.
         )
         
-        self.bot_name = config.bot_name
-        self.KEY_PREFIX = f"{self.bot_name.lower().replace(' ', '_')}:impression"
+        self.CATEGORIES_PER_SET = config.categories_per_set
+        self.LABELS_PER_SET = config.labels_per_set
+        self.CLUES_PER_SET = config.clues_per_set
+        self.IMPRESSION_TEXT_UNITS_PER_SET = config.impression_text_units_per_set
+
+        self.UNPINNED_EMOJI = config.unpinned_emoji
+        self.PINNED_EMOJI = config.pinned_emoji
+        
+        self.KEY_PREFIX = f"{config.bot_name.lower().replace(' ', '_')}:impression"
         
         self.RECENT_CATEGORY_ZSET_KEY = f"{self.KEY_PREFIX}:categories"
         self.RECENT_LABEL_ZSET_KEY = f"{self.KEY_PREFIX}:labels"
@@ -76,14 +48,68 @@ class ImpressionManager:
 
     async def close(self):
         """Close Redis connection."""
-        await self.redis_client.close()
+        await self.redis_client.aclose()
 
     # ==================== Mixed Memory ====================
-    
-    async def get_mixed_labels(self, limit: int = LABELS_PER_SET) -> List[tuple[str, float]]:
+
+    async def build_memory_context(self) -> str:
+        """Build memory-related prompt content by directly reading from storage
+        
+        Returns:
+            Memory-related prompt string
+        """
+        prompts = []
+
+        # Categories
+        impression_categories = await self.get_recent_categories()
+        impression_categories = list(reversed(impression_categories))
+        prompts.append(
+            "All your chronological memory impression categories with all users are as follows:\n"
+            "------\n"
+            f"{', '.join([name for name, _ in impression_categories] or [])}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        # Labels
+        impression_labels = await self.get_mixed_labels()
+        impression_labels = list(reversed(impression_labels))
+        prompts.append(
+            "Your recent chronological relevant memory impression labels with all users are as follows:\n"
+            "------\n"
+            f"{', '.join([name for name, _ in impression_labels] or [])}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        # Impressions
+        impressions = await self.get_mixed_impressions()
+        impressions = list(reversed(impressions))
+        impressions_text = "\n".join([
+            f"[{datetime.fromtimestamp(score // 1_000).strftime('%Y-%m-%d %H:%M:%S')}][{pin}][{clue}]{content}"
+            for pin, (clue, content), score in impressions
+        ] or [])
+        prompts.append(
+            "Your recent chronological relevant memory impressions (format [ModTime][Pin][Clue]Content) with all users are as follows:\n"
+            "------\n"
+            "[ModTime][Pin][Clue]Content\n"
+            "------\n"
+            f"{impressions_text}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        prompt_text = "\n\n".join(prompts)
+        logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units(prompt_text)}")
+
+        return prompt_text
+
+    async def get_mixed_labels(self, limit: int = None) -> List[tuple[str, float]]:
         """
         Get mixed labels from recent labels and recent categories, sorted by time (newest first)
         """
+        if limit is None:
+            limit = self.LABELS_PER_SET
         combined_labels = []
         combined_label_set = set()
         remaining_limit = limit
@@ -120,11 +146,13 @@ class ImpressionManager:
 
     async def get_mixed_impressions(
         self,
-        max_text_units: int = IMPRESSION_TEXT_UNITS_PER_SET,
+        max_text_units: int = None,
     ) -> List[tuple[str, (str, str), float]]:
         """
         Get global impression entries as (clue, content, score) tuples, sorted by time (newest first)
         """
+        if max_text_units is None:
+            max_text_units = self.IMPRESSION_TEXT_UNITS_PER_SET
         combined_impressions = []
         combined_clues = set()
         remaining_text_units = max_text_units
@@ -176,10 +204,12 @@ class ImpressionManager:
 
     # ==================== Recent Memory ====================
 
-    async def get_recent_categories(self, limit: int = CATEGORIES_PER_SET, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
+    async def get_recent_categories(self, limit: int = None, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
         """
         Get limited categories with their scores (timestamps)
         """
+        if limit is None:
+            limit = self.CATEGORIES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
             timestamp = time.time_ns() // 1_000_000
@@ -187,10 +217,12 @@ class ImpressionManager:
         # Get limited categories sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.RECENT_CATEGORY_ZSET_KEY, timestamp, 0, start=0, num=limit, withscores=True)
 
-    async def get_recent_labels(self, limit: int = LABELS_PER_SET, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
+    async def get_recent_labels(self, limit: int = None, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
         """
         Get limited labels with their scores (timestamps)
         """
+        if limit is None:
+            limit = self.LABELS_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
             timestamp = time.time_ns() // 1_000_000
@@ -198,10 +230,12 @@ class ImpressionManager:
         # Get limited labels sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.RECENT_LABEL_ZSET_KEY, timestamp, 0, start=0, num=limit, withscores=True)
 
-    async def get_recent_clues(self, limit: int = CLUES_PER_SET, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
+    async def get_recent_clues(self, limit: int = None, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
         """
         Get limited clues with their scores (timestamps)
         """
+        if limit is None:
+            limit = self.CLUES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
             timestamp = time.time_ns() // 1_000_000
@@ -209,19 +243,23 @@ class ImpressionManager:
         # Get limited clues sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.RECENT_CLUE_ZSET_KEY, timestamp, 0, start=0, num=limit, withscores=True)
     
-    async def get_pinned_clues(self, limit: int = CLUES_PER_SET) -> List[tuple[str, float]]:
+    async def get_pinned_clues(self, limit: int = None) -> List[tuple[str, float]]:
         """
         Get pinned clues with their scores (timestamps)
         """
+        if limit is None:
+            limit = self.CLUES_PER_SET
         # Get all pinned clues sorted by newest first with scores
         return await self.redis_client.zrevrangebyscore(self.PINNED_CLUE_ZSET_KEY, float('inf'), 0, start=0, num=limit, withscores=True)
 
     # ==================== Category Memory ====================
 
-    async def get_category_labels(self, category: str, limit: int = LABELS_PER_SET, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
+    async def get_category_labels(self, category: str, limit: int = None, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
         """
         Get limited labels for a given category with their scores (timestamps)
         """
+        if limit is None:
+            limit = self.LABELS_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
             timestamp = time.time_ns() // 1_000_000
@@ -229,10 +267,12 @@ class ImpressionManager:
         # Get limited labels sorted by newest first with scores, before the given timestamp
         return await self.redis_client.zrevrangebyscore(self.CATEGORY_LABEL_ZSET_KEY % category, timestamp, 0, start=0, num=limit, withscores=True)
     
-    async def get_category_clues(self, category: str, limit: int = CLUES_PER_SET, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
+    async def get_category_clues(self, category: str, limit: int = None, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
         """
         Get limited clues for a given category with their scores (timestamps)
         """
+        if limit is None:
+            limit = self.CLUES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
             timestamp = time.time_ns() // 1_000_000
@@ -242,10 +282,12 @@ class ImpressionManager:
 
     # ==================== Label Memory ====================
 
-    async def get_label_clues(self, label: str, limit: int = CLUES_PER_SET, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
+    async def get_label_clues(self, label: str, limit: int = None, timestamp: Optional[float] = None) -> List[tuple[str, float]]:
         """
         Get limited clues for a given label with their scores (timestamps)
         """
+        if limit is None:
+            limit = self.CLUES_PER_SET
         # Use current timestamp if not provided
         if timestamp is None:
             timestamp = time.time_ns() // 1_000_000
@@ -258,11 +300,13 @@ class ImpressionManager:
     async def get_impressions_by_clues(
         self,
         clues: List[tuple[str, float]] | List[str],
-        max_text_units: int = IMPRESSION_TEXT_UNITS_PER_SET
+        max_text_units: int = None
     ) -> List[tuple[(str, str), float]]:
         """
         Get impression entries as (clue, content, score) tuples
         """
+        if max_text_units is None:
+            max_text_units = self.IMPRESSION_TEXT_UNITS_PER_SET
         impressions = []
         selected_impressions = []
         
@@ -572,7 +616,6 @@ class ImpressionManager:
         final_content = new_content \
             or await self.redis_client.get(self.IMPRESSION_CONTENT_KEY % to_clue) \
             or await self.redis_client.get(self.IMPRESSION_CONTENT_KEY % from_clues[-1])
-        final_content = final_content.decode("utf-8") if isinstance(final_content, bytes) else final_content
         
         if not final_content:
             raise ValueError(f"No content found or new content for to_clue: {to_clue}")
@@ -649,56 +692,4 @@ class ImpressionManager:
             "to": to_clue,
             "final_content": final_content
         }
-
-    async def build_context(self) -> str:
-        """Build memory-related prompt content by directly reading from storage
-        
-        Returns:
-            Memory-related prompt string
-        """
-        prompts = []
-
-        # Categories
-        impression_categories = await self.get_recent_categories()
-        impression_categories = list(reversed(impression_categories))
-        prompts.append(
-            "All your chronological memory impression categories with all users are as follows:\n"
-            "------\n"
-            f"{', '.join([name for name, _ in impression_categories] or [])}\n"
-            "------\n"
-            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
-        )
-
-        # Labels
-        impression_labels = await self.get_mixed_labels()
-        impression_labels = list(reversed(impression_labels))
-        prompts.append(
-            "Your recent chronological relevant memory impression labels with all users are as follows:\n"
-            "------\n"
-            f"{', '.join([name for name, _ in impression_labels] or [])}\n"
-            "------\n"
-            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
-        )
-
-        # Impressions
-        impressions = await self.get_mixed_impressions()
-        impressions = list(reversed(impressions))
-        impressions_text = "\n".join([
-            f"[{datetime.fromtimestamp(score // 1_000).strftime('%Y-%m-%d %H:%M:%S')}][{pin}][{clue}]{content}"
-            for pin, (clue, content), score in impressions
-        ] or [])
-        prompts.append(
-            "Your recent chronological relevant memory impressions (format [ModTime][Pin][Clue]Content) with all users are as follows:\n"
-            "------\n"
-            "[ModTime][Pin][Clue]Content\n"
-            "------\n"
-            f"{impressions_text}\n"
-            "------\n"
-            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
-        )
-
-        prompt_text = "\n\n".join(prompts)
-        logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units(prompt_text)}")
-
-        return prompt_text
 

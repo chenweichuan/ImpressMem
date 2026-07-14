@@ -4,14 +4,16 @@ Base tool class for all agent tools
 from abc import ABC, abstractmethod
 from typing import Dict, Any
 
+from ..manager import ImpressMemManager
+
 
 class Tool(ABC):
     """Base class for all tools"""
     
     name = None
     
-    def __init__(self):
-        pass
+    def __init__(self, manager: ImpressMemManager):
+        self.manager = manager
     
     def get_name(self) -> str:
         """Get tool name"""

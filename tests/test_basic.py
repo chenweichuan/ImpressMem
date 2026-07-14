@@ -7,14 +7,14 @@ Naming convention: clue uses UPPERCASE with hyphens; category and label use Pasc
 import pytest
 import asyncio
 import json
-from impressmem import Config, ImpressionManager, slice_new_turn_messages
+from impressmem import ImpressMemConfig, ImpressMemManager, slice_new_turn_messages
 from impressmem.tools import SaveImpressionTool, OrganizeImpressionsTool, RecallImpressionsTool
 
 
 @pytest.mark.asyncio
 async def test_all_features_with_single_manager():
     """Test all features using a single manager instance to detect long-running issues"""
-    config = Config(
+    config = ImpressMemConfig(
         bot_name="Bot",
         redis_config={
             "host": "localhost",
@@ -22,7 +22,7 @@ async def test_all_features_with_single_manager():
             "db": 15  # Use a single high db number for all tests
         }
     )
-    manager = await ImpressionManager.initialize(config)
+    manager = ImpressMemManager(config)
     
     try:
         # ==================== Test ImpressionManager methods ====================
@@ -59,7 +59,7 @@ async def test_all_features_with_single_manager():
             labels=["TestLabel"],
             pin=False
         )
-        context = await manager.build_context()
+        context = await manager.build_memory_context()
         assert isinstance(context, str)
         assert len(context) > 0
         
@@ -139,9 +139,9 @@ async def test_all_features_with_single_manager():
         # ==================== Test tool classes ====================
         
         # Initialize tools
-        save_tool = SaveImpressionTool()
-        organize_tool = OrganizeImpressionsTool()
-        recall_tool = RecallImpressionsTool()
+        save_tool = SaveImpressionTool(manager)
+        organize_tool = OrganizeImpressionsTool(manager)
+        recall_tool = RecallImpressionsTool(manager)
         
         # Test get_definition for all tools
         save_def = await save_tool.get_definition()
@@ -219,6 +219,171 @@ async def test_all_features_with_single_manager():
         ]
         sliced = slice_new_turn_messages(messages)
         assert isinstance(sliced, list)
+        
+        # ==================== Test boundary conditions ====================
+        
+        # 1. Test empty strings
+        await manager.save_impression(
+            clue="EMPTY-CLUE",
+            content="test:content",
+            category="TestCategory",
+            labels=["TestLabel"],
+            pin=False
+        )
+        # Should handle empty content (won't save)
+        await manager.save_impression(
+            clue="EMPTY-CLUE-2",
+            content="",  # empty
+            category="TestCategory",
+            labels=["TestLabel"],
+            pin=False
+        )
+        # Should handle empty category (won't save)
+        await manager.save_impression(
+            clue="EMPTY-CLUE-3",
+            content="test:content",
+            category="",  # empty
+            labels=["TestLabel"],
+            pin=False
+        )
+        # Should handle empty labels (won't save)
+        await manager.save_impression(
+            clue="EMPTY-CLUE-4",
+            content="test:content",
+            category="TestCategory",
+            labels=[],  # empty
+            pin=False
+        )
+        
+        # 2. Test duplicate clue (update)
+        await manager.save_impression(
+            clue="DUPLICATE-CLUE",
+            content="version:1",
+            category="TestCategory",
+            labels=["TestLabel"],
+            pin=False
+        )
+        # Save again (update)
+        await manager.save_impression(
+            clue="DUPLICATE-CLUE",
+            content="version:2",
+            category="TestCategory",
+            labels=["TestLabel"],
+            pin=False
+        )
+        
+        # 3. Test very long content
+        long_content = "a" * 10000
+        await manager.save_impression(
+            clue="LONG-CLUE",
+            content=long_content,
+            category="TestCategory",
+            labels=["TestLabel"],
+            pin=False
+        )
+        
+        # ==================== Test error paths ====================
+        
+        # 1. Test merge same category
+        try:
+            await manager.merge_categories("TestCategory", "TestCategory")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Invalid from_category or to_category" in str(e)
+        
+        # 2. Test merge category with empty values
+        try:
+            await manager.merge_categories("", "TestCategory")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Invalid from_category or to_category" in str(e)
+        
+        # 3. Test merge same labels
+        try:
+            await manager.merge_labels(["TestLabel"], "TestLabel")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Invalid from_labels or to_label" in str(e)
+        
+        # 4. Test merge labels with empty values
+        try:
+            await manager.merge_labels([], "TestLabel")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Invalid from_labels or to_label" in str(e)
+        
+        # 5. Test merge same clues
+        try:
+            await manager.merge_clues(["DUPLICATE-CLUE"], "DUPLICATE-CLUE")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Invalid from_clues or to_clue" in str(e)
+        
+        # 6. Test merge clues with empty values
+        try:
+            await manager.merge_clues([], "TARGET-CLUE")
+            assert False, "Should have raised ValueError"
+        except ValueError as e:
+            assert "Invalid from_clues or to_clue" in str(e)
+        
+        # 7. Test tool error paths
+        # SaveImpressionTool - invalid parameters
+        invalid_save_args = {
+            "clue": "",  # empty
+            "content": "test:content",
+            "category": "TestCategory",
+            "labels": ["TestLabel"],
+            "pin": False
+        }
+        full_result, summary = await save_tool.execute(json.dumps(invalid_save_args))
+        assert "Error" in full_result or "❌" in summary
+        
+        # OrganizeImpressionsTool - invalid level
+        invalid_organize_args = {
+            "level": "invalid",  # not category/label/clue
+            "from_items": ["TestCategory"],
+            "to_item": "AnotherCategory",
+            "reason": "test",
+            "check": "test",
+            "is_redundant": True,
+            "is_confirm": True
+        }
+        full_result, summary = await organize_tool.execute(json.dumps(invalid_organize_args))
+        assert "Error" in full_result or "❌" in summary
+        
+        # OrganizeImpressionsTool - same from and to
+        same_organize_args = {
+            "level": "category",
+            "from_items": ["TestCategory"],
+            "to_item": "TestCategory",  # same as from
+            "reason": "test",
+            "check": "test",
+            "is_redundant": True,
+            "is_confirm": True
+        }
+        full_result, summary = await organize_tool.execute(json.dumps(same_organize_args))
+        assert "Error" in full_result or "❌" in summary
+        
+        # OrganizeImpressionsTool - not confirmed
+        not_confirmed_args = {
+            "level": "category",
+            "from_items": ["TempCategory"],
+            "to_item": "TestCategory",
+            "reason": "test",
+            "check": "test",
+            "is_redundant": True,
+            "is_confirm": False  # not confirmed
+        }
+        # First create TempCategory
+        await manager.save_impression(
+            clue="TEMP-CLUE",
+            content="test:content",
+            category="TempCategory",
+            labels=["TestLabel"],
+            pin=False
+        )
+        full_result, summary = await organize_tool.execute(json.dumps(not_confirmed_args))
+        assert "⚠️" in summary or "not confirmed" in full_result
         
     finally:
         await manager.close()

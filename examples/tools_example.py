@@ -11,13 +11,13 @@ ImpressMem 工具使用示例
 """
 import asyncio
 import json
-from impressmem import Config, ImpressionManager, slice_new_turn_messages
+from impressmem import ImpressMemConfig, ImpressMemManager, slice_new_turn_messages
 from impressmem.tools import SaveImpressionTool, OrganizeImpressionsTool, RecallImpressionsTool
 
 
 async def main():
     # 初始化配置
-    config = Config(
+    config = ImpressMemConfig(
         bot_name="Bot",
         redis_config={
             "host": "localhost",
@@ -27,14 +27,14 @@ async def main():
     )
 
     # 初始化 ImpressionManager
-    manager = await ImpressionManager.initialize(config)
+    manager = ImpressMemManager(config)
     print("✅ ImpressionManager 已初始化")
 
     try:
         # 初始化工具
-        save_tool = SaveImpressionTool()
-        organize_tool = OrganizeImpressionsTool()
-        recall_tool = RecallImpressionsTool()
+        save_tool = SaveImpressionTool(manager)
+        organize_tool = OrganizeImpressionsTool(manager)
+        recall_tool = RecallImpressionsTool(manager)
         print("✅ 工具已初始化")
 
         # 获取工具定义
@@ -115,7 +115,7 @@ async def main():
 
         # 显示记忆上下文
         print("\n🧠 记忆上下文:")
-        memory_context = await manager.build_context()
+        memory_context = await manager.build_memory_context()
         print("-" * 60)
         print(memory_context)
         print("-" * 60)
