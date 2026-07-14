@@ -55,7 +55,8 @@ class ImpressionManager:
             port=config.redis_config.get("port", 6379),
             db=config.redis_config.get("db", 0),
             password=config.redis_config.get("password") or None,
-            decode_responses=True
+            decode_responses=True,
+            protocol=2  # Use RESP2 for compatibility with older Redis versions
         )
         
         self.bot_name = config.bot_name
@@ -696,7 +697,8 @@ class ImpressionManager:
             "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
         )
 
-        logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units('\n\n'.join(prompts))}")
+        prompt_text = "\n\n".join(prompts)
+        logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units(prompt_text)}")
 
-        return "\n\n".join(prompts)
+        return prompt_text
 
