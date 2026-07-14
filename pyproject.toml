@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "impressmem"
 version = "0.1.0"
 authors = [
-    { name="Pacer", email="weichuan.chen@foxmail.com" }
+    { name="Weichuan Chen", email="weichuan.chen@foxmail.com" }
 ]
 description = "Impression-based hierarchical memory management library for AI applications with Redis storage"
 readme = "README.md"
@@ -38,7 +38,7 @@ llm = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/your-username/impressmem"
-Issues = "https://github.com/your-username/impressmem/issues"
-Documentation = "https://github.com/your-username/impressmem#readme"
-Repository = "https://github.com/your-username/impressmem.git"
+Homepage = "https://github.com/chenweichuan/ImpressMem"
+Issues = "https://github.com/chenweichuan/ImpressMem/issues"
+Documentation = "https://github.com/chenweichuan/ImpressMem#readme"
+Repository = "https://github.com/chenweichuan/ImpressMem.git"

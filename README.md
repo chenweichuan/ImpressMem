@@ -4,14 +4,10 @@ ImpressMem is an impression-based memory management library for AI applications.
 
 ## Installation
 
-### Basic installation (Redis only)
+Requires Redis server running on localhost:6379.
+
 ```bash
 pip install impressmem
-```
-
-### With LLM support (OpenAI-compatible)
-```bash
-pip install "impressmem[llm]"
 ```
 
 ## Quick Start
@@ -48,11 +44,7 @@ async def main():
     mixed_labels = await manager.get_mixed_labels()
     recent_categories = await manager.get_recent_categories()
     
-    memory_context = manager.context_builder.build_impressions_context(
-        impression_categories=recent_categories,
-        impression_labels=mixed_labels,
-        impressions=mixed_impressions
-    )
+    memory_context = await manager.build_context()
     
     print(memory_context)
     await manager.close()
@@ -68,9 +60,7 @@ asyncio.run(main())
 - Memory merge operations for organization
 - Redis-based storage for efficiency
 - Text unit-based memory limits for LLM context management
-- **OpenAI-compatible LLM client**
-- **Ready-to-use tool definitions for function calling**
-- **Tool processors to execute LLM calls**
+- **OpenAI-compatible tool definitions for function calling**
 
 ## Configuration
 
@@ -78,11 +68,6 @@ asyncio.run(main())
 ```python
 Config(
     bot_name: str,
-    bot_alias: str = "",
-    owner_name: str = "",
-    memory_model: str = "doubao-seed-2-1-turbo-260628",
-    openai_api_key: str = None,
-    openai_api_base: str = None,
     redis_config: Dict[str, Any] = ...
 )
 ```
@@ -110,132 +95,60 @@ await manager.save_impression(clue, content, category, labels, pin=False)
 mixed_impressions = await manager.get_mixed_impressions()
 mixed_labels = await manager.get_mixed_labels()
 recent_categories = await manager.get_recent_categories()
+recent_labels = await manager.get_recent_labels()
+recent_clues = await manager.get_recent_clues()
+pinned_clues = await manager.get_pinned_clues()
+category_labels = await manager.get_category_labels(category)
+category_clues = await manager.get_category_clues(category)
+label_clues = await manager.get_label_clues(label)
+impressions = await manager.get_impressions_by_clues(clues)
+
+# Build context
+memory_context = await manager.build_context()
 
 # Merge
 await manager.merge_categories(old, new)
 await manager.merge_labels(sources, target)
 await manager.merge_clues(sources, target, new_content=None)
+
+# Close
+await manager.close()
 ```
 
-### ContextBuilder
-Memory context builder class.
+### Tools
+OpenAI-compatible tool classes for function calling.
 
 ```python
-memory_context = manager.context_builder.build_impressions_context(
-    impression_categories=recent_categories,
-    impression_labels=mixed_labels,
-    impressions=mixed_impressions
-)
+from impressmem import SaveImpressionTool, OrganizeImpressionsTool, RecallImpressionsTool
+
+# Initialize tools
+save_tool = SaveImpressionTool()
+organize_tool = OrganizeImpressionsTool()
+recall_tool = RecallImpressionsTool()
+
+# Get tool definitions (for OpenAI function calling)
+save_def = await save_tool.get_definition()
+organize_def = await organize_tool.get_definition()
+recall_def = await recall_tool.get_definition()
+
+# Execute tools
+full_result, summary = await save_tool.execute(json.dumps(args))
 ```
 
-### LLMClient
-OpenAI-compatible client for memory processing.
+### Utility Functions
 
 ```python
-from impressmem import Config, LLMClient
+from impressmem import slice_new_turn_messages
 
-config = Config(
-    openai_api_key="your-api-key",
-    openai_api_base="https://your-api-base.com/v3",
-    redis_config={...}
-)
-
-llm = LLMClient(config)
-
-response = await llm.chat_completion(
-    messages=[...],
-    temperature=0.7,
-    max_tokens=500
-)
-```
-
-### Tool Definitions
-Get OpenAI-compatible tool schemas.
-
-```python
-from impressmem import get_all_tools
-
-tools = get_all_tools()  # List of save_impression, recall_impressions, organize_impressions
-```
-
-### ToolProcessor
-Execute tool calls from LLM.
-
-```python
-from impressmem import ToolProcessor
-
-processor = ToolProcessor(manager)
-
-# Execute by name
-full_result, summary = await processor.execute_tool(
-    "save_impression",
-    {"clue": "KEY", "content": "VALUE", "category": "CAT", "labels": ["LBL"]}
-)
-```
-
-## Complete Tool Integration Example
-
-```python
-import asyncio
-from impressmem import (
-    Config,
-    ImpressionManager,
-    ToolProcessor,
-    get_all_tools,
-    LLMClient,
-)
-
-async def main():
-    config = Config(...)
-    manager = await ImpressionManager.initialize(config)
-    processor = ToolProcessor(manager)
-    llm = LLMClient(config)
-    tools = get_all_tools()
-    
-    # 1. Get user message
-    user_msg = "Remember that I hate broccoli"
-    
-    # 2. Call LLM with tools
-    response = await llm.chat_completion(
-        messages=[
-            {"role": "user", "content": user_msg}
-        ],
-        tools=tools
-    )
-    
-    # 3. Execute tool calls if any
-    if response.choices[0].message.tool_calls:
-        for tool_call in response.choices[0].message.tool_calls:
-            full_result, summary = await processor.execute_tool(
-                tool_call.function.name,
-                tool_call.function.arguments
-            )
-            print(summary)
-    
-    await manager.close()
+# Slice messages for incremental memory processing
+sliced = slice_new_turn_messages(messages)
 ```
 
 ## Examples
 
 See the `examples/` directory for more usage examples:
-- `basic_usage.py` - Core memory operations
-- `merge_example.py` - Merge operations
-- `llm_example.py` - LLM client usage
-- `tool_integration_example.py` - Complete tool integration
-
-## Publishing to PyPI
-
-### Build the package
-```bash
-pip install --upgrade build
-python -m build
-```
-
-### Upload to PyPI
-```bash
-pip install --upgrade twine
-twine upload dist/*
-```
+- `context_example.py` - Build memory context
+- `tools_example.py` - Using the tool classes
 
 ## Contributing
 
