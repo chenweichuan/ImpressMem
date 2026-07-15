@@ -2,6 +2,7 @@
 Utility functions for ImpressMem
 """
 import logging
+import math
 from typing import Any, Dict, List
 
 # Setup logger
@@ -14,9 +15,7 @@ logger.addHandler(handler)
 
 
 def count_text_units(text: str) -> int:
-    """Count text units (tokens approximation)"""
-    # Simple implementation: count characters, ~1 token per 4 chars
-    return len(text) // 4
+    return math.ceil(len(text.encode("utf-8")) / 3)
 
 def slice_new_turn_messages(history: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """
