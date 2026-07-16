@@ -29,5 +29,5 @@ def slice_new_turn_messages(history: List[Dict[str, Any]]) -> List[Dict[str, Any
     """
     # Extract last bot message with previous bot message as context (include user messages in between if any)
     last_bot_idx = len(history) - 1 - next((i for i, msg in enumerate(reversed(history)) if msg["role"] == "assistant"), 0)
-    prev_bot_idx = len(history[:last_bot_idx]) - 1 - next((i for i, msg in enumerate(reversed(history[:last_bot_idx])) if msg["role"] == "assistant"), 0)
+    prev_bot_idx = last_bot_idx - 1 - next((i for i, msg in enumerate(reversed(history[:last_bot_idx])) if msg["role"] == "assistant"), 0)
     return history[prev_bot_idx:]
