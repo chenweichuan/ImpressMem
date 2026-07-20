@@ -33,9 +33,6 @@ dev = [
     "black",
     "isort",
 ]
-llm = [
-    "openai>=1.0.0",
-]
 
 [project.urls]
 Homepage = "https://github.com/chenweichuan/ImpressMem"
