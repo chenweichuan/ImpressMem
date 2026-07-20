@@ -2,7 +2,7 @@
 ImpressMem - Impression-based Memory Management Library
 """
 
-__version__ = "0.2.1"
+__version__ = "0.2.2"
 
 from impressmem.config import ImpressMemConfig
 from impressmem.manager import ImpressMemManager
