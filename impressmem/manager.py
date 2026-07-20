@@ -149,7 +149,7 @@ class ImpressMemManager:
         max_text_units: int = None,
     ) -> List[tuple[str, (str, str), float]]:
         """
-        Get global impression entries as (clue, content, score) tuples, sorted by time (newest first)
+        Get global impression entries as (pin_emoji, (clue, content), score) tuples, sorted by time (newest first)
         """
         if max_text_units is None:
             max_text_units = self.IMPRESSION_TEXT_UNITS_PER_SET
@@ -303,7 +303,7 @@ class ImpressMemManager:
         max_text_units: int = None
     ) -> List[tuple[(str, str), float]]:
         """
-        Get impression entries as (clue, content, score) tuples
+        Get impression entries as ((clue, content), score) tuples (when given (clue, score) tuples) or (clue, content) tuples (when given just strings)
         """
         if max_text_units is None:
             max_text_units = self.IMPRESSION_TEXT_UNITS_PER_SET
@@ -366,6 +366,8 @@ class ImpressMemManager:
         Args:
             clue: Clue for the impression
             content: Content corresponding to the clue
+            category: High-level category for the impression
+            labels: List of labels for the impression
             pin: Whether to pin this impression (critical information that should never be removed)
         """
         clue = clue.strip().replace("\n", " ")
