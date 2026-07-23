@@ -2,7 +2,12 @@
 ImpressMem - Impression-based Memory Management Library
 """
 
-__version__ = "0.2.2"
+from importlib.metadata import version, PackageNotFoundError
+
+try:
+    __version__ = version("impressmem")
+except PackageNotFoundError:
+    __version__ = "0.0.0"
 
 from impressmem.config import ImpressMemConfig
 from impressmem.manager import ImpressMemManager
