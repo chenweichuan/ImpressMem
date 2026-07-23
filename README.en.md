@@ -94,9 +94,9 @@ organize_tool = OrganizeImpressionsTool(manager)
 
 # Get OpenAI function calling tool definitions
 tools = [
-    await save_tool.get_definition(),
-    await recall_tool.get_definition(),
-    await organize_tool.get_definition(),
+    save_tool.get_definition(),
+    recall_tool.get_definition(),
+    organize_tool.get_definition(),
 ]
 
 # Pass to LLM tools parameter; Agent calls them autonomously
@@ -137,30 +137,36 @@ Auto-invoke SaveImpressionTool / OrganizeImpressionsTool to sink
 Core implementation:
 
 ```python
-from impressmem import slice_new_turn_messages, SaveImpressionTool, OrganizeImpressionsTool
+from impressmem import slice_new_turn_messages
 
 # 1. After each turn, slice out the incremental messages
 new_turn = slice_new_turn_messages(full_message_history)
 
-# 2. Build memory maintenance request: existing context + new turn + tool defs
-memory_context = await manager.build_memory_context()
-tools = [
-    await save_tool.get_definition(),
-    await organize_tool.get_definition(),
+# 2. Get the system prompt for memory maintenance (guides LLM to analyze messages, decide whether to save/merge)
+maintain_prompt = manager.get_maintain_prompt()
+# Returns str, instructing the LLM to analyze new messages, decide whether to save impressions or merge redundant ones
+
+# 3. Get tool definitions for memory maintenance (SaveImpressionTool + OrganizeImpressionsTool)
+maintain_tools = manager.get_maintain_tool_definitions()
+# Returns List[Dict[str, Any]], ready to pass to the LLM tools parameter
+
+# 4. Build the request and call the LLM
+messages_for_llm = [
+    {"role": "system", "content": await manager.build_memory_context()},
+    *new_turn,
+    {"role": "user", "content": maintain_prompt},
 ]
+response = await openai.chat.completions.create(
+    model="gpt-4",
+    messages=messages_for_llm,
+    tools=maintain_tools,
+)
 
-# 3. Let the LLM decide whether to save/organize
-prompt = """Analyze the new conversation. Determine if you need to:
-- Add or update memory impressions
-- Merge redundant or obsolete memory entries
-If nothing to do, reply "IGNORE"."""
-
-# 4. Auto-execute tool calls returned by LLM
-for tool_call in response.tool_calls:
-    if tool_call.function.name == SaveImpressionTool.name:
-        await save_tool.execute(tool_call.function.arguments)
-    elif tool_call.function.name == OrganizeImpressionsTool.name:
-        await organize_tool.execute(tool_call.function.arguments)
+# 5. Batch-execute tool calls returned by the LLM (auto-dispatches to save/organize tools)
+await manager.execute_maintain_tool_calls(response.choices[0].message.tool_calls)
+# Args: Optional[List[Dict[str, Any]]] — the tool_calls list from the LLM response
+# Each tool_call format: {"function": {"name": "...", "arguments": "<json_string>"}}
+# Unrecognized tool names are skipped with a warning; execution errors are caught and logged
 ```
 
 Both patterns can be used together: the Agent actively saves important info + the system passively sinks daily details, forming a complete memory system.
