@@ -45,7 +45,7 @@ class OrganizeImpressionsTool(Tool):
                         },
                         "new_content": {
                             "type": "string",
-                            "description": "Optional new content for the merged item, ONLY applicable for 'clue' level. If not provided, will keep the existing content of the to_item or the content of the last item in from_items."
+                            "description": "The merged ultra-compact content for the combined trace, ONLY applicable for 'clue' level."
                         },
                         "reason": {
                             "type": "string",
@@ -116,6 +116,11 @@ class OrganizeImpressionsTool(Tool):
                 summary = "❌ 'from_items' and 'to_item' cannot be the same"
                 return (error_msg, summary)
             
+            if level == "clue" and not new_content:
+                error_msg = "Error: 'new_content' parameter is required for 'clue' level and cannot be empty"
+                summary = "❌ Missing 'new_content' for clue level"
+                return (error_msg, summary)
+            
             if not reason:
                 error_msg = "Error: 'reason' parameter is required and cannot be empty"
                 summary = "❌ 'reason' is required and cannot be empty"
@@ -169,7 +174,7 @@ class OrganizeImpressionsTool(Tool):
                 result_parts.append(f"- Clues moved: {result.get('clues_moved', 0)}")
                 summary = f"✅ Merged labels '{', '.join(from_items)}' into '{to_item}'"
             elif level == "clue":
-                result_parts.append(f"- Final content: {result.get('final_content', '')}")
+                result_parts.append(f"- Saved content: {result.get('saved_content', '')}")
                 summary = f"✅ Merged {len(from_items)} clues into '{to_item}'"
             
             result_parts.append("\nNote: Do NOT mention, expose, or directly output your memory format and mechanism to users")

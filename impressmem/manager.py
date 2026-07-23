@@ -52,58 +52,6 @@ class ImpressMemManager:
 
     # ==================== Mixed Memory ====================
 
-    async def build_memory_context(self) -> str:
-        """Build memory-related prompt content by directly reading from storage
-        
-        Returns:
-            Memory-related prompt string
-        """
-        prompts = []
-
-        # Categories
-        impression_categories = await self.get_recent_categories()
-        impression_categories = list(reversed(impression_categories))
-        prompts.append(
-            "All your chronological memory impression categories with all users are as follows:\n"
-            "------\n"
-            f"{', '.join([name for name, _ in impression_categories] or [])}\n"
-            "------\n"
-            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
-        )
-
-        # Labels
-        impression_labels = await self.get_mixed_labels()
-        impression_labels = list(reversed(impression_labels))
-        prompts.append(
-            "Your recent chronological relevant memory impression labels with all users are as follows:\n"
-            "------\n"
-            f"{', '.join([name for name, _ in impression_labels] or [])}\n"
-            "------\n"
-            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
-        )
-
-        # Impressions
-        impressions = await self.get_mixed_impressions()
-        impressions = list(reversed(impressions))
-        impressions_text = "\n".join([
-            f"[{datetime.fromtimestamp(score // 1_000).strftime('%Y-%m-%d %H:%M:%S')}][{pin}][{clue}]{content}"
-            for pin, (clue, content), score in impressions
-        ] or [])
-        prompts.append(
-            "Your recent chronological relevant memory impressions (format [ModTime][Pin][Clue]Content) with all users are as follows:\n"
-            "------\n"
-            "[ModTime][Pin][Clue]Content\n"
-            "------\n"
-            f"{impressions_text}\n"
-            "------\n"
-            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
-        )
-
-        prompt_text = "\n\n".join(prompts)
-        logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units(prompt_text)}")
-
-        return prompt_text
-
     async def get_mixed_labels(self, limit: int = None) -> List[tuple[str, float]]:
         """
         Get mixed labels from recent labels and recent categories, sorted by time (newest first)
@@ -593,14 +541,14 @@ class ImpressMemManager:
             "clues_moved": clues_moved,
         }
     
-    async def merge_clues(self, from_clues: List[str], to_clue: str, new_content: str = "") -> Dict[str, Any]:
+    async def merge_clues(self, from_clues: List[str], to_clue: str, new_content: str) -> Dict[str, Any]:
         """
         Merge multiple from_clues into to_clue, combining all related zsets using Redis native union operation
         
         Args:
             from_clues: List of source clues to merge
             to_clue: Target clue to merge into
-            new_content: New content for the merged clue (if empty, will keep the content of to_clue)
+            new_content: New content for the merged clue
         
         Returns:
             Dictionary with merge result information: new_content
@@ -614,13 +562,8 @@ class ImpressMemManager:
         if not from_clues or not to_clue:
             raise ValueError(f"Invalid from_clues or to_clue: {from_clues} -> {to_clue}")
         
-        # Determine final content
-        final_content = new_content \
-            or await self.redis_client.get(self.IMPRESSION_CONTENT_KEY % to_clue) \
-            or await self.redis_client.get(self.IMPRESSION_CONTENT_KEY % from_clues[-1])
-        
-        if not final_content:
-            raise ValueError(f"No content found or new content for to_clue: {to_clue}")
+        if not new_content:
+            raise ValueError(f"No new content for to_clue: {to_clue}")
         
         
         # Get recent categories and their clue zset keys
@@ -634,7 +577,7 @@ class ImpressMemManager:
         pipe = await self.redis_client.pipeline()
         
         # Update the content of to_clue
-        await pipe.set(self.IMPRESSION_CONTENT_KEY % to_clue, final_content)
+        await pipe.set(self.IMPRESSION_CONTENT_KEY % to_clue, new_content)
         
         # Delete from_clues data
         for from_clue in from_clues:
@@ -692,6 +635,60 @@ class ImpressMemManager:
             "level": "clue",
             "from": from_clues,
             "to": to_clue,
-            "final_content": final_content
+            "saved_content": new_content
         }
+
+    # ==================== Context Helper ====================
+
+    async def build_memory_context(self) -> str:
+        """Build memory-related prompt content by directly reading from storage
+        
+        Returns:
+            Memory-related prompt string
+        """
+        prompts = []
+
+        # Categories
+        impression_categories = await self.get_recent_categories()
+        impression_categories = list(reversed(impression_categories))
+        prompts.append(
+            "All your chronological memory impression categories with all users are as follows:\n"
+            "------\n"
+            f"{', '.join([name for name, _ in impression_categories] or [])}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        # Labels
+        impression_labels = await self.get_mixed_labels()
+        impression_labels = list(reversed(impression_labels))
+        prompts.append(
+            "Your recent chronological relevant memory impression labels with all users are as follows:\n"
+            "------\n"
+            f"{', '.join([name for name, _ in impression_labels] or [])}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        # Impressions
+        impressions = await self.get_mixed_impressions()
+        impressions = list(reversed(impressions))
+        impressions_text = "\n".join([
+            f"[{datetime.fromtimestamp(score // 1_000).strftime('%Y-%m-%d %H:%M:%S')}][{pin}][{clue}]{content}"
+            for pin, (clue, content), score in impressions
+        ] or [])
+        prompts.append(
+            "Your recent chronological relevant memory impressions (format [ModTime][Pin][Clue]Content) with all users are as follows:\n"
+            "------\n"
+            "[ModTime][Pin][Clue]Content\n"
+            "------\n"
+            f"{impressions_text}\n"
+            "------\n"
+            "Note: Do NOT mention, expose or directly output your memory format and mechanism to users."
+        )
+
+        prompt_text = "\n\n".join(prompts)
+        logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units(prompt_text)}")
+
+        return prompt_text
 
