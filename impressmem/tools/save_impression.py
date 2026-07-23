@@ -36,7 +36,9 @@ class SaveImpressionTool(Tool):
                     "properties": {
                         "clue": {
                             "type": "string",
-                            "description": "Extremely concise, reusable identifier without time-of-day information, and should reasonably consider including user differentiation markers when appropriate. Give priority to merging or updating information for existing clues."
+                            "description": "Extremely concise, reusable identifier serving as a retrieval anchor, without time-of-day information, "
+                                "and should reasonably consider including user differentiation markers when appropriate. "
+                                "Dates may serve as identifiers or version markers but must not be used as aggregation keys to group unrelated traces into one clue. "
                         },
                         "content": {
                             "type": "string",
