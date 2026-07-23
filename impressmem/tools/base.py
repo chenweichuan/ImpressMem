@@ -20,7 +20,7 @@ class Tool(ABC):
         return self.name
     
     @abstractmethod
-    async def get_definition(self) -> Dict[str, Any]:
+    def get_definition(self) -> Dict[str, Any]:
         """Get tool definition for LLM"""
         pass
     

@@ -39,9 +39,9 @@ async def main():
 
         # 获取工具定义
         print("\n📋 工具定义:")
-        save_def = await save_tool.get_definition()
-        organize_def = await organize_tool.get_definition()
-        recall_def = await recall_tool.get_definition()
+        save_def = save_tool.get_definition()
+        organize_def = organize_tool.get_definition()
+        recall_def = recall_tool.get_definition()
         print(f"  - {save_def['function']['name']}")
         print(f"  - {organize_def['function']['name']}")
         print(f"  - {recall_def['function']['name']}")

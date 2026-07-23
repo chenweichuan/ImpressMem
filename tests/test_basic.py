@@ -128,7 +128,7 @@ async def test_all_features_with_single_manager():
         assert "CLUE-MERGE-001" in result["from"]
         assert "CLUE-MERGE-002" in result["from"]
         assert result["to"] == "CLUE-MERGE-TARGET"
-        assert "merged" in result["final_content"]
+        assert "merged" in result["saved_content"]
         
         # 7. Test additional methods used in examples
         mixed_labels = await manager.get_mixed_labels()
@@ -144,9 +144,9 @@ async def test_all_features_with_single_manager():
         recall_tool = RecallImpressionsTool(manager)
         
         # Test get_definition for all tools
-        save_def = await save_tool.get_definition()
-        organize_def = await organize_tool.get_definition()
-        recall_def = await recall_tool.get_definition()
+        save_def = save_tool.get_definition()
+        organize_def = organize_tool.get_definition()
+        recall_def = recall_tool.get_definition()
         assert "function" in save_def
         assert "name" in save_def["function"]
         assert "function" in organize_def
@@ -314,14 +314,14 @@ async def test_all_features_with_single_manager():
         
         # 5. Test merge same clues
         try:
-            await manager.merge_clues(["DUPLICATE-CLUE"], "DUPLICATE-CLUE")
+            await manager.merge_clues(["DUPLICATE-CLUE"], "DUPLICATE-CLUE", new_content="test")
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "Invalid from_clues or to_clue" in str(e)
         
         # 6. Test merge clues with empty values
         try:
-            await manager.merge_clues([], "TARGET-CLUE")
+            await manager.merge_clues([], "TARGET-CLUE", new_content="test")
             assert False, "Should have raised ValueError"
         except ValueError as e:
             assert "Invalid from_clues or to_clue" in str(e)
