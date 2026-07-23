@@ -21,7 +21,7 @@ class RecallImpressionsTool(Tool):
     def __init__(self, manager: ImpressMemManager):
         super().__init__(manager)
     
-    async def get_definition(self) -> Dict[str, Any]:
+    def get_definition(self) -> Dict[str, Any]:
         """Get tool definition for LLM"""
         return {
             "type": "function",

@@ -45,6 +45,11 @@ class ImpressMemManager:
         self.LABEL_CLUE_ZSET_KEY = f"{self.KEY_PREFIX}:label:clues:%s"
 
         self.IMPRESSION_CONTENT_KEY = f"{self.KEY_PREFIX}:content:%s"
+        
+        # Initialize impressmem tools
+        from .tools import SaveImpressionTool, OrganizeImpressionsTool
+        self.save_impression_tool = SaveImpressionTool(self)
+        self.organize_impressions_tool = OrganizeImpressionsTool(self)
 
     async def close(self):
         """Close Redis connection."""
@@ -691,4 +696,73 @@ class ImpressMemManager:
         logger.info(f"[ImpressionManager] Built impressions context text units: {count_text_units(prompt_text)}")
 
         return prompt_text
+
+    # ==================== Maintain Helper ====================
+
+    def get_maintain_prompt(self) -> str:
+        """
+        Get the system prompt instructing the LLM to maintain memory impressions.
+
+        Returns:
+            A prompt string that guides the LLM to analyze messages and decide
+            whether to save new impressions or merge redundant ones.
+        """
+        return (
+            "- Analyze whether to add or update memory impressions based on the new messages.\n"
+            "- Check for redundant categories, labels, or clues related to these messages that need merging.\n"
+            "Note:\n"
+            f"- Call {self.save_impression_tool.name} and/or {self.organize_impressions_tool.name} as needed.\n"
+            "- When multiple operations are needed, issue separate tool calls in parallel — one per operation.\n"
+            "- This analysis and memory processing operation itself should NOT be recorded as a memory impression.\n"
+            "- If there's nothing to do, just reply \"IGNORE\"."
+        )
+
+    def get_maintain_tool_definitions(self) -> List[Dict[str, Any]]:
+        """
+        Get the tool definitions for memory maintenance (save and organize impressions).
+
+        Returns:
+            A list of tool definition dicts compatible with the OpenAI/LLM function-calling schema.
+            Each dict describes one tool (name, description, parameters schema).
+        """
+        return [
+            self.save_impression_tool.get_definition(),
+            self.organize_impressions_tool.get_definition(),
+        ]
+
+    async def execute_maintain_tool_calls(
+        self,
+        tool_calls: Optional[List[Dict[str, Any]]],
+    ) -> None:
+        """
+        Execute a batch of LLM-issued maintenance tool calls.
+
+        Each tool_call is expected to follow the OpenAI function-calling format::
+
+            {
+                "function": {
+                    "name": "<tool_name>",
+                    "arguments": "<json_string>"
+                }
+            }
+
+        Args:
+            tool_calls: A list of tool call dicts from the LLM response, or None.
+                        Unrecognized tool names are logged as warnings and skipped.
+        """
+        for tool_call in tool_calls or []:
+            try:
+                function_name = tool_call["function"]["name"]
+                function_args = tool_call["function"]["arguments"]
+
+                if function_name == self.save_impression_tool.name:
+                    await self.save_impression_tool.execute(function_args)
+                elif function_name == self.organize_impressions_tool.name:
+                    await self.organize_impressions_tool.execute(function_args)
+                else:
+                    logger.warning(
+                        f"[ImpressionManager] Unknown maintain tool: {function_name}"
+                    )
+            except Exception as e:
+                logger.error(f"[ImpressionManager] Failed to execute maintain tool: {e}")
 
