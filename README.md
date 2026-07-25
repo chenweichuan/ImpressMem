@@ -44,7 +44,7 @@ ImpressMem 模拟人类"形成印象"的认知方式，让 AI Agent 拥有轻量
 pip install impressmem
 ```
 
-Requires Python 3.9+ and a running Redis instance (default: localhost:6379).
+Requires Python 3.8+ and a running Redis instance (default: localhost:6379).
 
 ## Quick Start
 
@@ -56,7 +56,6 @@ async def main():
     config = ImpressMemConfig(
         bot_name="MyAssistant",
         redis_config={"host": "localhost", "port": 6379, "db": 0},
-        # 也支持 Redis URL: {"url": "redis://:password@host:port/db"}
     )
     manager = ImpressMemManager(config)
 
@@ -196,9 +195,7 @@ ImpressMemConfig(
 )
 ```
 
-`redis_config` 支持两种格式：
-- 传统参数：`{"host": "localhost", "port": 6379, "db": 0, "password": "xxx"}`
-- URL 格式：`{"url": "redis://:password@host:6379/0"}`
+`redis_config` 接受传统参数字典：`{"host": "localhost", "port": 6379, "db": 0, "password": "xxx"}`
 
 
 ## Core API
