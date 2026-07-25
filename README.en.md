@@ -4,6 +4,8 @@
 
 ImpressMem simulates how humans form impressions, giving AI Agents lightweight, efficient, self-evolving long-term memory. No vector database, no embedding models, no extra services to deploy — just a Redis instance.
 
+![Demo](examples/demo.gif)
+
 ## Why ImpressMem?
 
 Existing AI memory solutions are powerful, but they typically require vector databases, embedding models, and internal LLM calls for information extraction — heavy dependencies and complex deployment.

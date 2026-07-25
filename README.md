@@ -4,6 +4,8 @@
 
 ImpressMem 模拟人类"形成印象"的认知方式，让 AI Agent 拥有轻量、高效、可自进化的长期记忆能力。它不依赖向量数据库、不需要 embedding 模型、不需要部署额外服务，只需要一个 Redis 实例。
 
+![Demo](examples/demo.gif)
+
 ## 为什么选 ImpressMem？
 
 现有的 AI 记忆方案功能强大，但往往需要向量数据库、embedding 模型、内部自动调用 LLM 做信息抽取，安装依赖多、部署复杂。
