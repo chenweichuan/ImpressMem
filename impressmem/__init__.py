@@ -12,7 +12,7 @@ except PackageNotFoundError:
 from impressmem.config import ImpressMemConfig
 from impressmem.manager import ImpressMemManager
 from impressmem.tools import (
-    SaveImpressionTool,
+    SaveImpressionsTool,
     OrganizeImpressionsTool,
     RecallImpressionsTool,
 )
@@ -21,7 +21,7 @@ from impressmem.utils import slice_new_turn_messages
 __all__ = [
     "ImpressMemConfig",
     "ImpressMemManager",
-    "SaveImpressionTool",
+    "SaveImpressionsTool",
     "OrganizeImpressionsTool",
     "RecallImpressionsTool",
     "slice_new_turn_messages",

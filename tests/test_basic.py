@@ -8,7 +8,7 @@ import pytest
 import asyncio
 import json
 from impressmem import ImpressMemConfig, ImpressMemManager, slice_new_turn_messages
-from impressmem.tools import SaveImpressionTool, OrganizeImpressionsTool, RecallImpressionsTool
+from impressmem.tools import SaveImpressionsTool, OrganizeImpressionsTool, RecallImpressionsTool
 
 
 @pytest.mark.asyncio
@@ -139,7 +139,7 @@ async def test_all_features_with_single_manager():
         # ==================== Test tool classes ====================
         
         # Initialize tools
-        save_tool = SaveImpressionTool(manager)
+        save_tool = SaveImpressionsTool(manager)
         organize_tool = OrganizeImpressionsTool(manager)
         recall_tool = RecallImpressionsTool(manager)
         
@@ -149,34 +149,52 @@ async def test_all_features_with_single_manager():
         recall_def = recall_tool.get_definition()
         assert "function" in save_def
         assert "name" in save_def["function"]
+        assert save_def["function"]["name"] == "save_impressions"
         assert "function" in organize_def
         assert "name" in organize_def["function"]
         assert "function" in recall_def
         assert "name" in recall_def["function"]
         
-        # Test SaveImpressionTool
+        # Test SaveImpressionsTool - single impression in array
         save_args = {
-            "clue": "TOOL-USER-JOHN-PREF",
-            "content": "pref:hates-broccoli;fav-game:Zelda;last-upd:2024-01-15",
-            "category": "UserPreferences",
-            "labels": ["UserProfile", "FoodPreference", "Gaming"],
-            "pin": False
+            "impressions": [
+                {
+                    "clue": "TOOL-USER-JOHN-PREF",
+                    "content": "pref:hates-broccoli;fav-game:Zelda;last-upd:2024-01-15",
+                    "category": "UserPreferences",
+                    "labels": ["UserProfile", "FoodPreference", "Gaming"],
+                    "pin": False
+                }
+            ]
         }
         full_result, summary = await save_tool.execute(json.dumps(save_args))
         assert full_result
         assert summary
+        assert "Saved 1" in summary
         
-        # Test SaveImpressionTool with another impression
-        save_args2 = {
-            "clue": "TOOL-USER-MARY-PROF",
-            "content": "prof:designer;tools:Figma,AdobeXD;experience:5y",
-            "category": "UserProfiles",
-            "labels": ["Occupation", "Design"],
-            "pin": False
+        # Test SaveImpressionsTool - batch multiple impressions
+        save_args_batch = {
+            "impressions": [
+                {
+                    "clue": "TOOL-USER-MARY-PROF",
+                    "content": "prof:designer;tools:Figma,AdobeXD;experience:5y",
+                    "category": "UserProfiles",
+                    "labels": ["Occupation", "Design"],
+                    "pin": False
+                },
+                {
+                    "clue": "TOOL-USER-MARY-PREF",
+                    "content": "pref:loves-coffee;hates:cilantro",
+                    "category": "UserPreferences",
+                    "labels": ["UserProfile", "FoodPreference"],
+                    "pin": False
+                }
+            ]
         }
-        full_result, summary = await save_tool.execute(json.dumps(save_args2))
+        full_result, summary = await save_tool.execute(json.dumps(save_args_batch))
         assert full_result
         assert summary
+        assert "Saved 2" in summary
         
         # Test RecallImpressionsTool by category
         recall_args = {
@@ -327,16 +345,50 @@ async def test_all_features_with_single_manager():
             assert "Invalid from_clues or to_clue" in str(e)
         
         # 7. Test tool error paths
-        # SaveImpressionTool - invalid parameters
+        # SaveImpressionsTool - empty impressions array
         invalid_save_args = {
-            "clue": "",  # empty
-            "content": "test:content",
-            "category": "TestCategory",
-            "labels": ["TestLabel"],
-            "pin": False
+            "impressions": []
         }
         full_result, summary = await save_tool.execute(json.dumps(invalid_save_args))
         assert "Error" in full_result or "❌" in summary
+        
+        # SaveImpressionsTool - impression with empty clue
+        invalid_save_args2 = {
+            "impressions": [
+                {
+                    "clue": "",
+                    "content": "test:content",
+                    "category": "TestCategory",
+                    "labels": ["TestLabel"],
+                    "pin": False
+                }
+            ]
+        }
+        full_result, summary = await save_tool.execute(json.dumps(invalid_save_args2))
+        assert "error" in full_result.lower() or "❌" in summary or "Error" in full_result
+        
+        # SaveImpressionsTool - batch with one valid and one invalid
+        mixed_save_args = {
+            "impressions": [
+                {
+                    "clue": "BATCH-VALID",
+                    "content": "valid:yes",
+                    "category": "TestCategory",
+                    "labels": ["TestLabel"],
+                    "pin": False
+                },
+                {
+                    "clue": "",
+                    "content": "invalid",
+                    "category": "TestCategory",
+                    "labels": ["TestLabel"],
+                    "pin": False
+                }
+            ]
+        }
+        full_result, summary = await save_tool.execute(json.dumps(mixed_save_args))
+        assert "Saved 1" in summary
+        assert "1 error" in summary
         
         # OrganizeImpressionsTool - invalid level
         invalid_organize_args = {

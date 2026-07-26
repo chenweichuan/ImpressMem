@@ -47,8 +47,8 @@ class ImpressMemManager:
         self.IMPRESSION_CONTENT_KEY = f"{self.KEY_PREFIX}:content:%s"
         
         # Initialize impressmem tools
-        from .tools import SaveImpressionTool, OrganizeImpressionsTool
-        self.save_impression_tool = SaveImpressionTool(self)
+        from .tools import SaveImpressionsTool, OrganizeImpressionsTool
+        self.save_impressions_tool = SaveImpressionsTool(self)
         self.organize_impressions_tool = OrganizeImpressionsTool(self)
 
     async def close(self):
@@ -711,7 +711,7 @@ class ImpressMemManager:
             "- Analyze whether to add or update memory impressions based on the new messages.\n"
             "- Check for redundant categories, labels, or clues related to these messages that need merging.\n"
             "Note:\n"
-            f"- Call {self.save_impression_tool.name} and/or {self.organize_impressions_tool.name} as needed.\n"
+            f"- Call {self.save_impressions_tool.name} and/or {self.organize_impressions_tool.name} as needed.\n"
             "- When multiple operations are needed, issue separate tool calls in parallel — one per operation.\n"
             "- This analysis and memory processing operation itself should NOT be recorded as a memory impression.\n"
             "- If there's nothing to do, just reply \"IGNORE\"."
@@ -726,7 +726,7 @@ class ImpressMemManager:
             Each dict describes one tool (name, description, parameters schema).
         """
         return [
-            self.save_impression_tool.get_definition(),
+            self.save_impressions_tool.get_definition(),
             self.organize_impressions_tool.get_definition(),
         ]
 
@@ -755,8 +755,8 @@ class ImpressMemManager:
                 function_name = tool_call["function"]["name"]
                 function_args = tool_call["function"]["arguments"]
 
-                if function_name == self.save_impression_tool.name:
-                    await self.save_impression_tool.execute(function_args)
+                if function_name == self.save_impressions_tool.name:
+                    await self.save_impressions_tool.execute(function_args)
                 elif function_name == self.organize_impressions_tool.name:
                     await self.organize_impressions_tool.execute(function_args)
                 else:

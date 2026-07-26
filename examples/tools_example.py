@@ -12,7 +12,7 @@ ImpressMem 工具使用示例
 import asyncio
 import json
 from impressmem import ImpressMemConfig, ImpressMemManager, slice_new_turn_messages
-from impressmem.tools import SaveImpressionTool, OrganizeImpressionsTool, RecallImpressionsTool
+from impressmem.tools import SaveImpressionsTool, OrganizeImpressionsTool, RecallImpressionsTool
 
 
 async def main():
@@ -32,7 +32,7 @@ async def main():
 
     try:
         # 初始化工具
-        save_tool = SaveImpressionTool(manager)
+        save_tool = SaveImpressionsTool(manager)
         organize_tool = OrganizeImpressionsTool(manager)
         recall_tool = RecallImpressionsTool(manager)
         print("✅ 工具已初始化")
@@ -46,28 +46,43 @@ async def main():
         print(f"  - {organize_def['function']['name']}")
         print(f"  - {recall_def['function']['name']}")
 
-        # 示例 1: 使用工具保存印象
-        print("\n📝 示例 1: 保存印象...")
+        # 示例 1: 使用工具批量保存印象（单条）
+        print("\n📝 示例 1: 保存单条印象...")
         save_args = {
-            "clue": "USER-JOHN-PREF",
-            "content": "pref:hates-broccoli;fav-game:Zelda;last-upd:2024-01-15",
-            "category": "UserPreferences",
-            "labels": ["UserProfile", "FoodPreference", "Gaming"],
-            "pin": False
+            "impressions": [
+                {
+                    "clue": "USER-JOHN-PREF",
+                    "content": "pref:hates-broccoli;fav-game:Zelda;last-upd:2024-01-15",
+                    "category": "UserPreferences",
+                    "labels": ["UserProfile", "FoodPreference", "Gaming"],
+                    "pin": False
+                }
+            ]
         }
         full_result, summary = await save_tool.execute(json.dumps(save_args))
         print(f"  {summary}")
 
-        # 示例 2: 保存另一个印象
-        print("\n📝 示例 2: 保存另一个印象...")
-        save_args2 = {
-            "clue": "USER-MARY-PROF",
-            "content": "prof:designer;tools:Figma,AdobeXD;experience:5y",
-            "category": "UserProfiles",
-            "labels": ["Occupation", "Design"],
-            "pin": False
+        # 示例 2: 批量保存多条印象（碎片化存储）
+        print("\n📝 示例 2: 批量保存多条印象...")
+        save_args_batch = {
+            "impressions": [
+                {
+                    "clue": "USER-MARY-PROF",
+                    "content": "prof:designer;tools:Figma,AdobeXD;experience:5y",
+                    "category": "UserProfiles",
+                    "labels": ["Occupation", "Design"],
+                    "pin": False
+                },
+                {
+                    "clue": "USER-MARY-PREF",
+                    "content": "pref:loves-coffee;hates:cilantro",
+                    "category": "UserPreferences",
+                    "labels": ["UserProfile", "FoodPreference"],
+                    "pin": False
+                }
+            ]
         }
-        full_result, summary = await save_tool.execute(json.dumps(save_args2))
+        full_result, summary = await save_tool.execute(json.dumps(save_args_batch))
         print(f"  {summary}")
 
         # 示例 3: 按类别召回印象

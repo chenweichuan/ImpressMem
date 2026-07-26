@@ -1,9 +1,9 @@
-from .save_impression import SaveImpressionTool
+from .save_impressions import SaveImpressionsTool
 from .organize_impressions import OrganizeImpressionsTool
 from .recall_impressions import RecallImpressionsTool
 
 __all__ = [
-    "SaveImpressionTool",
+    "SaveImpressionsTool",
     "OrganizeImpressionsTool",
     "RecallImpressionsTool",
 ]

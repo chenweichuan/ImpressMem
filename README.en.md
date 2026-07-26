@@ -83,14 +83,14 @@ Three Tool classes implement the OpenAI function calling interface. Register the
 import json
 from impressmem import (
     ImpressMemConfig, ImpressMemManager,
-    SaveImpressionTool, RecallImpressionsTool, OrganizeImpressionsTool
+    SaveImpressionsTool, RecallImpressionsTool, OrganizeImpressionsTool
 )
 
 config = ImpressMemConfig(bot_name="MyAssistant", redis_config={"host": "localhost"})
 manager = ImpressMemManager(config)
 
 # Initialize tools
-save_tool = SaveImpressionTool(manager)
+save_tool = SaveImpressionsTool(manager)
 recall_tool = RecallImpressionsTool(manager)
 organize_tool = OrganizeImpressionsTool(manager)
 
@@ -108,12 +108,12 @@ tools = [
 #     tools=tools,
 # )
 
-# Execute tool calls:
+# Execute tool calls (batch support, save multiple fragmented impressions at once):
 # full_result, summary = await save_tool.execute(json.dumps({
-#     "clue": "USER-PREFERENCE-COLOR",
-#     "content": "User prefers purple theme",
-#     "category": "UserPreference",
-#     "labels": ["Color", "UI"],
+#     "impressions": [
+#         {"clue": "USER-PREF-COLOR", "content": "User prefers purple theme", "category": "UserPreference", "labels": ["Color", "UI"]},
+#         {"clue": "USER-PREF-LANG", "content": "Prefers English responses", "category": "UserPreference", "labels": ["Language"]},
+#     ]
 # }))
 ```
 
@@ -133,7 +133,7 @@ Build context (existing memories + new turn + Save/Organize tool defs)
     ↓
 LLM autonomously decides: new info to save? redundant memories to merge?
     ↓
-Auto-invoke SaveImpressionTool / OrganizeImpressionsTool to sink
+Auto-invoke SaveImpressionsTool / OrganizeImpressionsTool to sink
 ```
 
 Core implementation:
@@ -148,7 +148,7 @@ new_turn = slice_new_turn_messages(full_message_history)
 maintain_prompt = manager.get_maintain_prompt()
 # Returns str, instructing the LLM to analyze new messages, decide whether to save impressions or merge redundant ones
 
-# 3. Get tool definitions for memory maintenance (SaveImpressionTool + OrganizeImpressionsTool)
+# 3. Get tool definitions for memory maintenance (SaveImpressionsTool + OrganizeImpressionsTool)
 maintain_tools = manager.get_maintain_tool_definitions()
 # Returns List[Dict[str, Any]], ready to pass to the LLM tools parameter
 
@@ -225,7 +225,7 @@ All three tool classes provide two methods:
 
 | Tool | Purpose |
 |------|---------|
-| `SaveImpressionTool` | Save a new impression, auto-deduplicate and update |
+| `SaveImpressionsTool` | Batch save multiple impressions (fragmented storage), auto-deduplicate and update |
 | `RecallImpressionsTool` | Retrieve impressions by category/labels |
 | `OrganizeImpressionsTool` | Merge redundant categories/labels/clues, clean up memory |
 

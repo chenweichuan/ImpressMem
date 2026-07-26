@@ -82,14 +82,14 @@ ImpressMem 在实战中有两种典型用法：
 import json
 from impressmem import (
     ImpressMemConfig, ImpressMemManager,
-    SaveImpressionTool, RecallImpressionsTool, OrganizeImpressionsTool
+    SaveImpressionsTool, RecallImpressionsTool, OrganizeImpressionsTool
 )
 
 config = ImpressMemConfig(bot_name="MyAssistant", redis_config={"host": "localhost"})
 manager = ImpressMemManager(config)
 
 # 初始化三个工具
-save_tool = SaveImpressionTool(manager)
+save_tool = SaveImpressionsTool(manager)
 recall_tool = RecallImpressionsTool(manager)
 organize_tool = OrganizeImpressionsTool(manager)
 
@@ -107,12 +107,12 @@ tools = [
 #     tools=tools,
 # )
 
-# 执行工具调用时：
+# 执行工具调用时（支持批量，一次保存多条碎片化印象）：
 # full_result, summary = await save_tool.execute(json.dumps({
-#     "clue": "USER-PREFERENCE-COLOR",
-#     "content": "用户喜欢紫色主题",
-#     "category": "UserPreference",
-#     "labels": ["Color", "UI"],
+#     "impressions": [
+#         {"clue": "USER-PREF-COLOR", "content": "用户喜欢紫色主题", "category": "UserPreference", "labels": ["Color", "UI"]},
+#         {"clue": "USER-PREF-LANG", "content": "偏好中文回复", "category": "UserPreference", "labels": ["Language"]},
+#     ]
 # }))
 ```
 
@@ -132,7 +132,7 @@ slice_new_turn_messages(full_history)  ← 切出本轮增量消息
     ↓
 LLM 自主判断：是否有新信息需要保存？是否有冗余记忆需要合并？
     ↓
-自动调用 SaveImpressionTool / OrganizeImpressionsTool 执行沉淀
+自动调用 SaveImpressionsTool / OrganizeImpressionsTool 执行沉淀
 ```
 
 核心实现思路：
@@ -147,7 +147,7 @@ new_turn = slice_new_turn_messages(full_message_history)
 maintain_prompt = manager.get_maintain_prompt()
 # 返回 str，指导 LLM 分析新消息、判断是否需要保存印象或合并冗余
 
-# 3. 获取记忆维护所需的工具定义（SaveImpressionTool + OrganizeImpressionsTool）
+# 3. 获取记忆维护所需的工具定义（SaveImpressionsTool + OrganizeImpressionsTool）
 maintain_tools = manager.get_maintain_tool_definitions()
 # 返回 List[Dict[str, Any]]，可直接传给 LLM 的 tools 参数
 
@@ -222,7 +222,7 @@ await manager.close()
 
 | Tool | 用途 |
 |------|------|
-| `SaveImpressionTool` | 保存一条新印象，自动去重更新 |
+| `SaveImpressionsTool` | 批量保存多条印象（支持碎片化存储），自动去重更新 |
 | `RecallImpressionsTool` | 按 category/labels 检索相关印象 |
 | `OrganizeImpressionsTool` | 合并冗余分类/标签/线索，清理记忆结构 |
 
