@@ -25,7 +25,7 @@ class SaveImpressionsTool(Tool):
             "type": "function",
             "function": {
                 "name": self.name,
-                "description": "Generate memory impressions that need to be saved in an ultra-compact information-dense form "
+                "description": "Generate memory impressions that need to be added or updated in an ultra-compact information-dense form "
                     "using an ultra-compact symbolic system, to serve as contextual memory traces. "
                     "Each impression MUST have its own distinct clue — split rich content into multiple fragmented impressions "
                     "with separate clues rather than merging unrelated information into one. "
