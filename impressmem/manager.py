@@ -712,6 +712,8 @@ class ImpressMemManager:
             "- Check for redundant categories, labels, or clues related to these messages that need merging.\n"
             "Note:\n"
             f"- Call {self.save_impressions_tool.name} and/or {self.organize_impressions_tool.name} as needed.\n"
+            "- When saving impressions, reuse existing clues to overwrite outdated information.\n"
+            "- When multiple clues represent the same memory trace, use organize to merge them."
             "- When multiple operations are needed, issue separate tool calls in parallel — one per operation.\n"
             "- This analysis and memory processing operation itself should NOT be recorded as a memory impression.\n"
             "- If there's nothing to do, just reply \"IGNORE\"."
