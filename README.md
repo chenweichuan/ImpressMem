@@ -191,7 +191,7 @@ ImpressMemConfig(
     categories_per_set: int = 500,    # 每轮上下文最大分类数
     labels_per_set: int = 1500,       # 每轮上下文最大标签数
     clues_per_set: int = 500,         # 每轮上下文最大线索数
-    impression_text_units_per_set: int = 15000,  # 每轮上下文最大文本单元
+    impression_text_units_per_set: int = 10000,  # 每轮上下文最大文本单元
     unpinned_emoji: str = "⚪",       # 非置顶印象标记
     pinned_emoji: str = "📌",         # 置顶印象标记
 )

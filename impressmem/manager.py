@@ -68,7 +68,7 @@ class ImpressMemManager:
         remaining_limit = limit
         
         # Get recent labels
-        recent_labels = await self.get_recent_labels(remaining_limit // 5)
+        recent_labels = await self.get_recent_labels(remaining_limit // 10)
         combined_labels += recent_labels
         combined_label_set = combined_label_set.union({label for label, _ in recent_labels})
         remaining_limit -= len(recent_labels)
@@ -77,12 +77,12 @@ class ImpressMemManager:
         recent_categories = await self.get_recent_categories()
         category_labels_ref = {}
         for category, _ in recent_categories:
-            if remaining_limit // 5 <= 0:
+            if remaining_limit // 10 <= 0:
                 break
             
             category_labels = await self.get_category_labels(category)
             category_labels = list(filter(lambda x: x[0] not in combined_label_set, category_labels))
-            category_labels = category_labels[:remaining_limit // 5]
+            category_labels = category_labels[:remaining_limit // 10]
             if category_labels:
                 category_labels_ref[category] = category_labels
                 combined_labels += category_labels
@@ -120,7 +120,7 @@ class ImpressMemManager:
         # Get impressions for recent clues, with a portion of the text units reserved for them to ensure they are always included
         recent_clue_tuples = await self.get_recent_clues()
         recent_clue_tuples = list(filter(lambda x: x[0] not in combined_clues, recent_clue_tuples))
-        recent_impressions = await self.get_impressions_by_clues(recent_clue_tuples, remaining_text_units // 5)
+        recent_impressions = await self.get_impressions_by_clues(recent_clue_tuples, remaining_text_units // 10)
         combined_impressions += [(self.UNPINNED_EMOJI, imp, score) for imp, score in recent_impressions]
         combined_clues = combined_clues.union({clue for (clue, _), _ in recent_impressions})
         remaining_text_units -= count_text_units(str([imp for imp, _ in recent_impressions]))
@@ -134,12 +134,12 @@ class ImpressMemManager:
                 if combined_impressions else self.IMPRESSION_TEXT_UNITS_PER_SET // self.CLUES_PER_SET
                 
             # Stop if not enough text units for the next impression
-            if remaining_text_units // 5 < estimated_text_units_per_impression:
+            if remaining_text_units < estimated_text_units_per_impression * 2:
                 break
             
             category_clue_tuples = await self.get_category_clues(category)
             category_clue_tuples = list(filter(lambda x: x[0] not in combined_clues, category_clue_tuples))
-            category_impressions = await self.get_impressions_by_clues(category_clue_tuples, remaining_text_units // 5)
+            category_impressions = await self.get_impressions_by_clues(category_clue_tuples, remaining_text_units // 10)
             if category_impressions:
                 category_impressions_ref[category] = category_impressions
                 combined_impressions += [(self.UNPINNED_EMOJI, imp, score) for imp, score in category_impressions]

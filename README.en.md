@@ -193,7 +193,7 @@ ImpressMemConfig(
     categories_per_set: int = 500,    # Max categories per context
     labels_per_set: int = 1500,       # Max labels per context
     clues_per_set: int = 500,         # Max clues per context
-    impression_text_units_per_set: int = 15000,  # Max text units per context
+    impression_text_units_per_set: int = 10000,  # Max text units per context
     unpinned_emoji: str = "⚪",       # Unpinned impression marker
     pinned_emoji: str = "📌",         # Pinned impression marker
 )
