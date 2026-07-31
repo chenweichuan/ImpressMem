@@ -202,8 +202,8 @@ class ImpressMemManager:
         """
         if limit is None:
             limit = self.CLUES_PER_SET
-        # Get all pinned clues sorted by newest first with scores
-        return await self.redis_client.zrevrangebyscore(self.PINNED_CLUE_ZSET_KEY, float('inf'), 0, start=0, num=limit, withscores=True)
+        # Get all pinned clues sorted by oldest first with scores
+        return await self.redis_client.zrangebyscore(self.PINNED_CLUE_ZSET_KEY, 0, float('inf'), start=0, num=limit, withscores=True)
 
     # ==================== Category Memory ====================
 
